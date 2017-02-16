@@ -49,7 +49,7 @@ let myPlayerId = null;
     jumpy: 0
 }*/
 
-const myPlayer = new Player(100, canvas.height - 50, randomColor(), 0, 10, { 1:false,2:false,3:false,4:false},false, false );
+let myPlayer = new Player(100, canvas.height - 50, randomColor(), 10, 0, { 1:false,2:false,3:false,4:false},false, false );
 
 const Paint = {
     RECTANGLE_STROKE_STYLE : 'black',
@@ -64,17 +64,23 @@ let lastMovementRight = false;
 let players = {};
 let bullets = [];
 
-function gameloop(){
-    requestAnimationFrame(gameloop);
-    logic();
-    render();
+let past = Date.now()
+function gameloop () {
+    requestAnimationFrame(gameloop)
+    const now = Date.now()
+    const delta = (now - past)/10
+    past = now
+    logic(delta)
+    render()
 }
 
 requestAnimationFrame(gameloop);
+
 //Reposcion del objeto para cada frame
-function logic () {
-    let wx = myPlayer.vx;
-    let wy = myPlayer.vy;
+function logic (delta) {
+    let current = {x:myPlayer.x, y:myPlayer.y}
+    let wx = myPlayer.vx * delta;
+    let wy = myPlayer.vy * delta;
 
     if (teclado.isKeyDown(teclado.LEFT_ARROW) && !teclado.isKeyDown(teclado.RIGHT_ARROW) && myPlayer.x >= 1) {
         myPlayer.x-= wx;
@@ -82,43 +88,45 @@ function logic () {
     } else if (teclado.isKeyDown(teclado.RIGHT_ARROW) && !teclado.isKeyDown(teclado.LEFT_ARROW) && myPlayer.x <= (canvas.width - 51)) {
        lastMovementRight = true;
         myPlayer.x+= wx;
-    
     }else if (teclado.isKeyDown(teclado.DOWN_ARROW) && !teclado.isKeyDown(teclado.UP_ARROW) && myPlayer.y <= (canvas.height-51)){
-         //myPlayer.vy++
-        //  myPlayer.y+=4;  
     }else if(teclado.isKeyDown(teclado.SPACE_BAR)){
-           // myPlayer.isShotting = true;
+           
     }
 
     if (teclado.isKeyDown(teclado.UP_ARROW) && !teclado.isKeyDown(teclado.DOWN_ARROW) && myPlayer.y >= 1){
-        //myPlayer.vy--
-        //myPlayer.y-=4;
         jump(myPlayer);}
 
     if (isSpaceUp){
-            
-        let buttel = new bulletclass (myPlayer,ctx,lastMovementRight);
+        let buttel = new bulletclass ( myPlayer, ctx, lastMovementRight, delta);
         bullets.push(buttel);
         //myPlayer.isShotting = false;
         isSpaceUp = false;
     }
-
      
      if (myPlayer.isJumping && myPlayer.y < myPlayer.jumpy){
-         console.log("isjumping");
-        myPlayer.vy-=gravity;
+         myPlayer.vy-=gravity;
          myPlayer.y -= myPlayer.vy;
      }else if (myPlayer.isJumping){
-         console.log("END isjumping");
+         
         myPlayer.vy = 0;
         myPlayer.y = myPlayer.jumpy;
         myPlayer.jumpy = 0;
         myPlayer.isJumping = false
      }
 
-     console.log("VY" + myPlayer.vy);
-     
-   
+    //ley de la gravedad 
+     if (myPlayer.y < canvas.height - 50 && !myPlayer.isJumping){
+        myPlayer.vy += gravity;
+        myPlayer.y += myPlayer.vy;
+     }else if (myPlayer.y > canvas.height - 50 && !myPlayer.isJumping){
+        myPlayer.y = canvas.height;
+        myPlayer.vy = 0;
+     }
+
+     if (myPlayer.x != current.x || myPlayer.y != current.y){
+         let myInputsa = {x: myPlayer.x, y: myPlayer.y };
+        socket.emit('move', myInputsa);
+     }
 }
 
 function render () {
@@ -139,9 +147,7 @@ function render () {
         }else{
             paint_lines(players[playerId],true);                
         }
-
     }
-
     renderAllBullets(ctx)
 }
 
@@ -220,6 +226,7 @@ socket.on('connect', function () {
         myPlayerId = myId
         myPlayer.id = myId
         players = serverPlayers
+        console.log(serverPlayers);
         players[myId] = myPlayer
     })
 
